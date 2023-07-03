@@ -6,6 +6,28 @@ from sklearn.metrics import r2_score
 data=pd.read_csv('flightdata.csv')
 df = pd.read_csv('flightdata.csv')
 
+#visiulasition
+import seaborn as sns
+
+sns.distplot(df['ARR_DELAY'], bins=20, kde=True, hist_kws={"range": [-60, 60]})
+
+# Set plot title and labels
+plt.title("Distribution Plot of ARR_DELAY")
+plt.xlabel("ARR_DELAY")
+plt.ylabel("Frequency")
+plt.xlim([-60,60])
+# Show the plot
+plt.show()
+
+
+sns.catplot(y="ARR_DELAY", data=df, kind='box')
+plt.ylim(-50, 40)
+# Set plot title and labels
+plt.title("Box Plot of ARR_DELAY")
+plt.ylabel("ARR_DELAY")
+
+
+
 df.isna().sum()
 
 
@@ -57,17 +79,6 @@ merged = merged.drop(['ORIGIN', 'DEST'], axis=1)
 
 y=merged['ARR_DELAY']
 X=merged.drop(['CANCELLED', 'DIVERTED','ADJUSTED','ARR_DELAY'], axis=1)
-
-
-
-
-
-
-
-
-
-
-
 
 
 
