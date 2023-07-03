@@ -1,0 +1,21 @@
+need to deletad
+
+arr_delay
+arr_del15
+actual_elapsed time- we have crs_elapsed_time
+dep_delay
+dep_delay15
+dep_time - we have crs_dept_time
+arr_time we have crs_arr_time
+actual_elapsed_time
+year
+tail_number
+FL_num -because so few data
+origin_airpot_id - we have origin -dummy
+dest_airpot_id - we have dest -dummy
+
+
+we need to discuss departure delay and arrived delay
+
+1696 flights elapsed time more than expected and couse more delay
+9140 flights elapsed time less than expected reduce the delay
