@@ -17,6 +17,20 @@ from tensorflow.python.estimator import keras
 import tensorflow as tf
 
 from sklearn.metrics import precision_score, recall_score, f1_score, accuracy_score
+import category_encoders as ce
+
+def printScore(y_test,y_pred):
+    precision = precision_score(y_test, y_pred)
+    recall = recall_score(y_test, y_pred)
+    f1 = f1_score(y_test, y_pred)
+    accuracy = accuracy_score(y_test, y_pred)
+
+    # Display the results
+    print("Precision: {:.3f}".format(precision))
+    print("Recall: {:.3f}".format(recall))
+    print("F1-score: {:.3f}".format(f1))
+    print("Accuracy: {:.3f}".format(accuracy))
+    return
 
 # In[] data read
 data=pd.read_csv('flightdata.csv')
@@ -36,8 +50,8 @@ df=df[df['ARR_DEL15'].notnull()]
 
 print(df.columns)
 
-dummycolumns=['YEAR','CRS_DEP_TIME','DEP_DELAY',
-       'UNIQUE_CARRIER', 'TAIL_NUM', 'FL_NUM', 'ORIGIN_AIRPORT_ID',
+dummycolumns=['YEAR',
+       'UNIQUE_CARRIER', 'FL_NUM', 'ORIGIN_AIRPORT_ID',
        'DEST_AIRPORT_ID', 'CRS_ARR_TIME', 'ARR_DELAY',
         'CRS_ELAPSED_TIME', 'ACTUAL_ELAPSED_TIME','CANCELLED', 'DIVERTED',
         'Unnamed: 25']
@@ -56,6 +70,12 @@ for i in dummycolumns:
 
 
 # In[] data preprocessing
+
+#tail number catagory encoder
+tenc=ce.TargetEncoder() 
+df['TAIL_DELAY']=tenc.fit_transform(df['TAIL_NUM'],df['ARR_DEL15'])
+
+df['TAIL_DELAY2'] = df.groupby('TAIL_NUM')['ARR_DEL15'].transform('mean')
 
 #timeblk
 # Helper function to create ARR_TIME_BLOCK
@@ -106,6 +126,11 @@ df['DEP_TIME_BLOCK'] = df['DEP_TIME'].apply(lambda x :arr_time(x))
 df['ARR_TIME'] = df['ARR_TIME'].astype('int')
 df['ARR_TIME_BLOCK'] = df['ARR_TIME'].apply(lambda x :arr_time(x))
 
+df['CRS_DEP_TIME'] = df['CRS_DEP_TIME'].astype('int')
+df['CRS_DEP_TIME_BLOCK'] = df['CRS_DEP_TIME'].apply(lambda x :arr_time(x))
+
+df['CRS_ARR_TIME'] = df['ARR_TIME'].astype('int')
+df['CRS_ARR_TIME_BLOCK'] = df['CRS_ARR_TIME'].apply(lambda x :arr_time(x))
 
 print(df.columns)
 
@@ -124,6 +149,10 @@ df['DISTANCE_cat'] = pd.qcut(df['DISTANCE'], q=8)
 pd.DataFrame({'unicos':df.nunique(),
               'missing': df.isna().mean()*100,
               'tipo':df.dtypes})
+
+
+
+
 
 # In[] some statstic
 
@@ -227,29 +256,33 @@ dep_time_block_df = dep_time_block_df.sort_index()
 
 
 # In[] Models preparation
-df=df.drop(['DEP_TIME','ARR_TIME','DISTANCE'], axis=1)
+# df=df.drop(['DEP_TIME','ARR_TIME','DISTANCE','CRS_DEP_TIME','DEP_DELAY','DEP_DEL15'], axis=1)
 
+# df=df.drop(['DEP_TIME_BLOCK', 'ARR_TIME_BLOCK'], axis=1)
 
+# df=df.drop(['CRS_ARR_TIME'], axis=1)
 
 cat_vars_final = df.select_dtypes(['object','category'])
-cat_vars_final.drop(['ARR_DEL15','ARR_TIME_BLOCK','DEP_TIME_BLOCK'], axis=1, inplace=True)
+cat_vars_final.drop(['ARR_DEL15','TAIL_NUM'], axis=1, inplace=True)
+cat_vars_final.drop(['DEP_TIME','ARR_TIME','DISTANCE','CRS_DEP_TIME','DEP_DELAY','DEP_DEL15'], axis=1, inplace=True)
+cat_vars_final.drop(['DEP_TIME_BLOCK', 'ARR_TIME_BLOCK'], axis=1, inplace=True)
+cat_vars_final.drop(['CRS_ARR_TIME'], axis=1, inplace=True)
 
 enc = OneHotEncoder().fit(cat_vars_final)
-
 cat_vars_ohe_final = enc.transform(cat_vars_final).toarray()
 feature_names = enc.get_feature_names_out(cat_vars_final.columns.tolist())
 cat_vars_ohe_final = pd.DataFrame(cat_vars_ohe_final, index=cat_vars_final.index, columns=feature_names)
 
-
+cat_vars_ohe_final['TAIL_DELAY2']=df['TAIL_DELAY2']
 
 
 
 y=df['ARR_DEL15']
 X=cat_vars_ohe_final
 
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.10,stratify= y, shuffle=True)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.20,stratify= y, shuffle=True)
 
-
+print(cat_vars_final.columns)
 
 # In[] decisionTree
 tree1 = tree.DecisionTreeRegressor(criterion='squared_error')
@@ -282,13 +315,9 @@ result['Match'] = result['Predicted'] == result['Actual']
 cm = confusion_matrix(y_test, y_pred)
 printScore(y_test,y_pred)
 
-print('accurucy score:',accuracy_score(y_test, y_pred))
 
 
-print(np.count_nonzero(y_test == 0))
 
-print('Random Forest R2 value')
-print(r2_score(y_test, rf_reg.predict(X_test)))
 
 # In[] logistic regression
 lr_model_final = LogisticRegression(C=1.0,n_jobs=-1,verbose=1, random_state=154)
@@ -414,43 +443,21 @@ print(np.array(acc_per_fold).mean()) # average accuracy of all 10 created models
 # Now you can save the final model and use it to get confusion matrix. If you will compare the confision matrix . ( but i suggest you to use avarage accuracy.
 
 y_pred=final_model.predict(X_test)
-y_pred = np.where(y_pred < 0.2, 0, 1)
+y_pred = np.where(y_pred < 0.5, 0, 1)
 
 
 
 cm = confusion_matrix(y_test, y_pred)
+printScore(y_test,y_pred)
 
-
-precision = precision_score(y_test, y_pred)
-recall = recall_score(y_test, y_pred)
-f1 = f1_score(y_test, y_pred)
-accuracy = accuracy_score(y_test, y_pred)
-
-# Display the results
-print("Precision: {:.3f}".format(precision))
-print("Recall: {:.3f}".format(recall))
-print("F1-score: {:.3f}".format(f1))
-print("Accuracy: {:.3f}".format(accuracy))
 
 #save and load
-final_model.save('model')
-new_model = tf.keras.models.load_model('model')
-a=new_model.predict(X_test)
+final_model.save('model3')
+# new_model = tf.keras.models.load_model('model')
 
 
 
-def printScore(y_test,y_pred):
-    precision = precision_score(y_test, y_pred)
-    recall = recall_score(y_test, y_pred)
-    f1 = f1_score(y_test, y_pred)
-    accuracy = accuracy_score(y_test, y_pred)
 
-    # Display the results
-    print("Precision: {:.3f}".format(precision))
-    print("Recall: {:.3f}".format(recall))
-    print("F1-score: {:.3f}".format(f1))
-    print("Accuracy: {:.3f}".format(accuracy))
-    return
 
 
 
